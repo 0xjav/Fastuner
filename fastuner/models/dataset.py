@@ -48,8 +48,8 @@ class Dataset(Base, TimestampMixin):
         JSON, default={"train": 0.8, "val": 0.1, "test": 0.1}, nullable=False
     )
 
-    # Additional metadata
-    metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    # Additional metadata (renamed from 'metadata' to avoid SQLAlchemy reserved word)
+    extra_metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
 
     # Relationships
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="datasets")

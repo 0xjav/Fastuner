@@ -30,7 +30,7 @@ class DatasetResponse(BaseModel):
     test_samples: int
     split_seed: int
     split_ratios: Dict[str, float]
-    metadata: Optional[Dict[str, Any]] = None
+    extra_metadata: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime
 
