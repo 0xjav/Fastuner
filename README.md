@@ -4,7 +4,7 @@
 
 Fastuner enables developers to deploy and fine-tune open-source LLMs with a single command. Built for production, optimized for cost.
 
-## Features (V0) ✅
+## Features
 
 - **One-click deployment** of Hugging Face models to SageMaker
 - **LoRA/QLoRA fine-tuning** with automatic dataset validation
@@ -13,7 +13,6 @@ Fastuner enables developers to deploy and fine-tune open-source LLMs with a sing
 - **Task-aware dataset splitting** with stratification support
 - **CLI-first** developer experience
 - **Infrastructure as Code** with Terraform
-- **Comprehensive tests** with 30+ test cases
 - **Cost tracking** and automatic cleanup
 
 ## Quick Start
@@ -66,14 +65,13 @@ fastuner cleanup cost-report
 
 ## Architecture
 
-- **Control Plane**: FastAPI + SQLite (V0) / PostgreSQL (production)
+- **Control Plane**: FastAPI + SQLAlchemy + SQLite
 - **Compute Plane**: SageMaker Training Jobs + LMI Inference Endpoints
 - **Storage**: S3 (datasets, adapters, artifacts)
 - **Cleanup**: Lambda + EventBridge (scheduled TTL-based cleanup)
-- **Auth**: Query params (V0) / AWS Cognito JWT (production)
 - **Infrastructure**: Terraform for AWS resource management
 
-## Dataset Schema (V0)
+## Dataset Schema
 
 ```jsonl
 {"input_text": "Classify sentiment: I love this product!", "target_text": "positive"}
@@ -152,9 +150,9 @@ For detailed development instructions, see [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Roadmap
 
-- **V0** (Current): CLI + LoRA fine-tuning + multi-tenant serving
-- **V1**: Web UI, canary deployments, async inference
-- **V2**: Full fine-tuning, RLHF/DPO, experiment tracking
+- ✅ CLI + LoRA/QLoRA fine-tuning + multi-tenant serving
+- 🔜 Web UI, canary deployments, async inference
+- 🔜 Full fine-tuning, RLHF/DPO, experiment tracking
 
 ## License
 
