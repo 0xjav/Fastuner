@@ -4,7 +4,7 @@
 
 Fastuner enables developers to deploy and fine-tune open-source LLMs with a single command. Built for production, optimized for cost.
 
-## Features (V0)
+## Features (V0) ✅
 
 - **One-click deployment** of Hugging Face models to SageMaker
 - **LoRA/QLoRA fine-tuning** with automatic dataset validation
@@ -12,36 +12,66 @@ Fastuner enables developers to deploy and fine-tune open-source LLMs with a sing
 - **Ephemeral compute** with TTL-driven cleanup for cost optimization
 - **Task-aware dataset splitting** with stratification support
 - **CLI-first** developer experience
+- **Infrastructure as Code** with Terraform
+- **Comprehensive tests** with 30+ test cases
+- **Cost tracking** and automatic cleanup
 
 ## Quick Start
 
+### 1. Deploy Infrastructure
 ```bash
+cd infra/terraform
+./deploy.sh
+# Copy the outputs to your .env file
+```
+
+### 2. Install and Configure
+```bash
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
 # Install
-pip install fastuner
+pip install -e .
 
+# Configure .env with AWS credentials from Terraform outputs
+```
+
+### 3. Use the CLI
+```bash
 # Upload dataset
-fastuner datasets upload data.jsonl --task-type text_generation
+fastuner datasets upload examples/skyrim_ner/skyrim_entities.jsonl \
+  --name "skyrim_gliner2" \
+  --task-type text_generation
 
-# Fine-tune with LoRA
+# Fine-tune with QLoRA
 fastuner finetune start \
-  --model-id meta-llama/Llama-2-7b-chat-hf \
+  --model-id glineur/gliner_medium-v2.1 \
   --dataset-id ds_xxx \
-  --method qlora \
-  --auto-deploy
+  --adapter-name skyrim_entities_v1 \
+  --method qlora
+
+# Deploy adapter
+fastuner deployments create --adapter-id adp_xxx
 
 # Run inference
 fastuner inference run \
-  --model-id meta-llama/Llama-2-7b-chat-hf \
-  --adapter sentiment_v1 \
-  --input "Great service!"
+  --model-id glineur/gliner_medium-v2.1 \
+  --adapter skyrim_entities_v1 \
+  --input "Alduin destroyed Helgen"
+
+# Monitor costs
+fastuner cleanup cost-report
 ```
 
 ## Architecture
 
-- **Control Plane**: FastAPI + PostgreSQL + AWS Step Functions
+- **Control Plane**: FastAPI + SQLite (V0) / PostgreSQL (production)
 - **Compute Plane**: SageMaker Training Jobs + LMI Inference Endpoints
 - **Storage**: S3 (datasets, adapters, artifacts)
-- **Auth**: AWS Cognito JWT
+- **Cleanup**: Lambda + EventBridge (scheduled TTL-based cleanup)
+- **Auth**: Query params (V0) / AWS Cognito JWT (production)
+- **Infrastructure**: Terraform for AWS resource management
 
 ## Dataset Schema (V0)
 
@@ -89,25 +119,34 @@ cp .env.example .env
 alembic upgrade head
 ```
 
-### Running the Service
+### Running Tests
 
 ```bash
-# Run API server (with auto-reload)
-uvicorn fastuner.api.main:app --reload
+# Install test dependencies
+pip install -r requirements-dev.txt
 
-# Run tests
-pytest tests/ -v
+# Run all tests
+pytest
 
-# Run CLI
-fastuner --help
+# Run with coverage
+pytest --cov=fastuner tests/
+
+# Run specific test file
+pytest tests/test_validator.py -v
 ```
 
 ### Infrastructure Deployment
 
 ```bash
-cd infra/cdk
-cdk deploy
+cd infra/terraform
+./deploy.sh
 ```
+
+This will create:
+- S3 buckets for datasets and adapters
+- SageMaker execution role
+- Lambda cleanup function
+- EventBridge schedule for automatic cleanup
 
 For detailed development instructions, see [CONTRIBUTING.md](CONTRIBUTING.md)
 
