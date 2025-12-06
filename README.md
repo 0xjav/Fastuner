@@ -17,51 +17,58 @@ Fastuner enables developers to deploy and fine-tune open-source LLMs with a sing
 
 ## Quick Start
 
-### 1. Deploy Infrastructure
+**New to Fastuner?** → See [SETUP_GUIDE.md](SETUP_GUIDE.md) for complete step-by-step instructions!
+
+### 1. Configure AWS Credentials
+```bash
+aws configure
+# Enter your AWS Access Key ID, Secret Access Key, and region
+```
+
+### 2. Install Fastuner
+```bash
+git clone https://github.com/0xjav/Fastuner.git
+cd Fastuner
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -e .
+```
+
+### 3. Deploy Infrastructure
 ```bash
 cd infra/terraform
-./deploy.sh
+./deploy.sh  # Creates S3 buckets, IAM roles, Lambda function
 # Copy the outputs to your .env file
 ```
 
-### 2. Install and Configure
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install
-pip install -e .
-
-# Configure .env with AWS credentials from Terraform outputs
-```
-
-### 3. Use the CLI
+### 4. Use the CLI
 ```bash
 # Upload dataset
-fastuner datasets upload examples/skyrim_ner/skyrim_entities.jsonl \
-  --name "skyrim_gliner2" \
-  --task-type text_generation
+fastuner datasets upload examples/sentiment_analysis/sentiment.jsonl \
+  --name "sentiment_v1" \
+  --task-type classification
 
-# Fine-tune with QLoRA
+# Fine-tune with LoRA
 fastuner finetune start \
-  --model-id glineur/gliner_medium-v2.1 \
+  --model-id distilbert-base-uncased \
   --dataset-id ds_xxx \
-  --adapter-name skyrim_entities_v1 \
-  --method qlora
+  --adapter-name sentiment_adapter \
+  --method lora
 
 # Deploy adapter
 fastuner deployments create --adapter-id adp_xxx
 
 # Run inference
 fastuner inference run \
-  --model-id glineur/gliner_medium-v2.1 \
-  --adapter skyrim_entities_v1 \
-  --input "Alduin destroyed Helgen"
+  --model-id distilbert-base-uncased \
+  --adapter sentiment_adapter \
+  --input "This product is amazing!"
 
 # Monitor costs
 fastuner cleanup cost-report
 ```
+
+See [SETUP_GUIDE.md](SETUP_GUIDE.md) for detailed instructions and troubleshooting!
 
 ## Architecture
 
