@@ -6,15 +6,113 @@ Complete step-by-step instructions to get Fastuner running on your machine.
 
 ## Prerequisites
 
-- **Python 3.11+** installed
+Before starting, you need:
+- **Python 3.10+** installed
 - **AWS Account** with admin access
-- **AWS CLI** installed ([Install Guide](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html))
-- **Terraform 1.5+** installed ([Install Guide](https://developer.hashicorp.com/terraform/install))
 - **Git** installed
+
+We'll install AWS CLI and Terraform in the steps below.
 
 ---
 
-## Step 1: AWS Credentials Setup
+## Step 1: Install AWS CLI
+
+### Windows
+
+**Option 1: MSI Installer (Recommended)**
+
+1. Download: https://awscli.amazonaws.com/AWSCLIV2.msi
+2. Run the installer
+3. Open a **new** PowerShell window
+4. Verify:
+   ```powershell
+   aws --version
+   ```
+
+**Option 2: Using winget**
+```powershell
+winget install -e --id Amazon.AWSCLI
+```
+
+### macOS
+
+```bash
+# Using Homebrew
+brew install awscli
+
+# Verify
+aws --version
+```
+
+### Linux
+
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install awscli
+
+# Verify
+aws --version
+```
+
+---
+
+## Step 2: Install Terraform
+
+### Windows
+
+**Option 1: Using winget (Easiest)**
+```powershell
+winget install Hashicorp.Terraform
+```
+
+**Option 2: Using Chocolatey**
+```powershell
+choco install terraform
+```
+
+**Option 3: Manual Install**
+1. Download: https://www.terraform.io/downloads
+2. Extract `terraform.exe` to `C:\terraform\`
+3. Add to PATH:
+   - Press `Win + R` → type `sysdm.cpl`
+   - Advanced tab → Environment Variables
+   - Edit **Path** → Add `C:\terraform`
+   - Click OK
+
+**After installation:**
+- Close and reopen PowerShell
+- Verify:
+  ```powershell
+  terraform --version
+  ```
+
+### macOS
+
+```bash
+# Using Homebrew
+brew tap hashicorp/tap
+brew install hashicorp/tap/terraform
+
+# Verify
+terraform --version
+```
+
+### Linux
+
+```bash
+# Ubuntu/Debian
+wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt update && sudo apt install terraform
+
+# Verify
+terraform --version
+```
+
+---
+
+## Step 3: Configure AWS Credentials
 
 ### Option A: Using AWS CLI (Recommended)
 
@@ -69,7 +167,7 @@ $env:AWS_DEFAULT_REGION="us-west-2"
 
 ---
 
-## Step 2: Clone and Install Fastuner
+## Step 4: Clone and Install Fastuner
 
 1. **Clone the repository**:
    ```bash
@@ -104,7 +202,7 @@ $env:AWS_DEFAULT_REGION="us-west-2"
 
 ---
 
-## Step 3: Deploy AWS Infrastructure
+## Step 5: Deploy AWS Infrastructure
 
 1. **Navigate to Terraform directory**:
    ```bash
@@ -153,7 +251,7 @@ $env:AWS_DEFAULT_REGION="us-west-2"
 
 ---
 
-## Step 4: Configure Environment
+## Step 6: Configure Environment
 
 1. **Go back to project root**:
    ```bash
@@ -197,7 +295,7 @@ $env:AWS_DEFAULT_REGION="us-west-2"
 
 ---
 
-## Step 5: Test the Setup
+## Step 7: Test the Setup
 
 ### Test 1: Upload Sentiment Dataset
 
