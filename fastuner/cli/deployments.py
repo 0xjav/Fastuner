@@ -36,12 +36,12 @@ def list_deployments(limit: int):
             console.print("[yellow]No active deployments found[/yellow]")
             return
 
-        table = Table(title="Deployments")
-        table.add_column("ID", style="cyan")
-        table.add_column("Endpoint", style="green")
-        table.add_column("Adapter ID", style="magenta")
+        table = Table(title="Deployments", show_lines=True)
+        table.add_column("ID", style="cyan", no_wrap=False)
+        table.add_column("Endpoint", style="green", no_wrap=False)
+        table.add_column("Adapter ID", style="magenta", no_wrap=False)
         table.add_column("Status", style="yellow")
-        table.add_column("Instance")
+        table.add_column("Instance", no_wrap=False)
         table.add_column("TTL (hrs)", justify="right")
 
         for dep in deployments:
@@ -56,9 +56,9 @@ def list_deployments(limit: int):
             ttl_hours = dep["ttl_seconds"] / 3600
 
             table.add_row(
-                dep["id"][:8] + "...",
-                dep["endpoint_name"][:30],
-                dep["adapter_id"][:8] + "...",
+                dep["id"],
+                dep["endpoint_name"],
+                dep["adapter_id"],
                 f"[{status_color}]{dep['status']}[/{status_color}]",
                 dep["instance_type"],
                 f"{ttl_hours:.1f}",

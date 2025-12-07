@@ -76,7 +76,10 @@ def run_inference(
             console.print(Panel(input_text, border_style="cyan"))
 
             console.print(f"\n[bold]Output:[/bold]")
-            console.print(Panel(result["outputs"][0], border_style="green"))
+            if result["outputs"] and len(result["outputs"]) > 0:
+                console.print(Panel(result["outputs"][0], border_style="green"))
+            else:
+                console.print(Panel(f"[yellow]No output returned. Raw result: {result}[/yellow]", border_style="yellow"))
 
             console.print(f"\n[dim]Latency: {result['latency_ms']:.2f}ms | Adapter: {result['adapter_name']}[/dim]")
 

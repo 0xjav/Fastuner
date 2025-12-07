@@ -4,7 +4,10 @@ from fastuner.config import get_settings
 settings = get_settings()
 logs = boto3.client('logs', region_name=settings.aws_region)
 
-endpoint_name = "ft-default-sentiment-adapt-dep-9c9b"
+import sys
+
+# Get endpoint name from command line or use default
+endpoint_name = sys.argv[1] if len(sys.argv) > 1 else "ft-default-sentiment-adapt-dep-98cc"
 
 try:
     # Get log streams for this endpoint

@@ -5,7 +5,10 @@ from datetime import datetime, timezone
 settings = get_settings()
 sagemaker = boto3.client('sagemaker', region_name=settings.aws_region)
 
-endpoint_name = "ft-default-sentiment-adapt-dep-9c9b"
+import sys
+
+# Get endpoint name from command line or use default
+endpoint_name = sys.argv[1] if len(sys.argv) > 1 else "ft-default-sentiment-adapt-dep-98cc"
 
 try:
     response = sagemaker.describe_endpoint(EndpointName=endpoint_name)

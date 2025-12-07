@@ -186,8 +186,21 @@ class InferenceOrchestrator:
 
             latency_ms = (end_time - start_time).total_seconds() * 1000
 
+            # Log the raw response for debugging
+            logger.info(f"Raw LMI response: {result}")
+
+            # Handle different response formats from LMI
+            outputs = result.get("outputs", result.get("predictions", []))
+
+            # If result is a list directly, use it
+            if isinstance(result, list):
+                outputs = result
+            # If result has 'generated_text' key (common in HF format)
+            elif isinstance(result, dict) and "generated_text" in result:
+                outputs = [result["generated_text"]]
+
             return {
-                "outputs": result.get("outputs", result.get("predictions", [])),
+                "outputs": outputs,
                 "latency_ms": latency_ms,
             }
 

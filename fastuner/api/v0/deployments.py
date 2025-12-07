@@ -115,7 +115,7 @@ async def list_deployments(
     limit: int = 100,
     db: Session = Depends(get_db),
 ):
-    """List all deployments for a tenant"""
+    """List all deployments for a tenant and sync status from SageMaker"""
     deployments = (
         db.query(Deployment)
         .filter(Deployment.tenant_id == tenant_id)
@@ -123,6 +123,25 @@ async def list_deployments(
         .limit(limit)
         .all()
     )
+
+    # Sync status for creating deployments
+    for deployment in deployments:
+        if deployment.status == DeploymentStatus.CREATING:
+            try:
+                endpoint_status = inference_orchestrator.get_endpoint_status(deployment.endpoint_name)
+
+                # Map SageMaker status to our status
+                sagemaker_status = endpoint_status["status"]
+                if sagemaker_status == "InService":
+                    deployment.status = DeploymentStatus.ACTIVE
+                elif sagemaker_status in ["Failed"]:
+                    deployment.status = DeploymentStatus.FAILED
+
+            except Exception as e:
+                logger.warning(f"Failed to sync SageMaker status for deployment {deployment.id}: {e}")
+
+    db.commit()
+
     return deployments
 
 
