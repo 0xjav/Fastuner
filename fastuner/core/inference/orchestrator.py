@@ -23,8 +23,8 @@ settings = get_settings()
 class InferenceOrchestrator:
     """Orchestrates SageMaker inference endpoints for multi-tenant adapter serving"""
 
-    # Default LMI inference image
-    DEFAULT_LMI_IMAGE = "763104351884.dkr.ecr.{region}.amazonaws.com/djl-inference:0.25.0-deepspeed0.11.0-cu118"
+    # Default LMI inference image (latest version with vLLM 0.11.1 and Transformers 4.57.1)
+    DEFAULT_LMI_IMAGE = "763104351884.dkr.ecr.{region}.amazonaws.com/djl-inference:0.35.0-lmi17.0.0-cu128"
 
     def __init__(self):
         self.sagemaker = get_sagemaker_client()
