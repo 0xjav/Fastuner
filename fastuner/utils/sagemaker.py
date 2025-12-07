@@ -29,6 +29,7 @@ class SageMakerClient:
         instance_count: int = 1,
         max_runtime_seconds: int = 86400,  # 24 hours
         volume_size_gb: int = 100,
+        entry_point: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Create a SageMaker training job.
@@ -51,6 +52,12 @@ class SageMakerClient:
         try:
             # Convert hyperparameters to strings (SageMaker requirement)
             str_hyperparameters = {k: str(v) for k, v in hyperparameters.items()}
+
+            # Add entry point if provided (for Hugging Face containers)
+            # Note: source_dir parameter should be passed separately if needed
+            if entry_point:
+                str_hyperparameters["sagemaker_program"] = entry_point
+                # sagemaker_submit_directory will be set in orchestrator if source_dir is provided
 
             response = self.sagemaker.create_training_job(
                 TrainingJobName=job_name,

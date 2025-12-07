@@ -51,7 +51,7 @@ def set_api_base_url(url: str):
 def get_tenant_id() -> Optional[str]:
     """Get tenant ID from config or environment"""
     # For V0, use environment variable or default
-    tenant_id = os.getenv("FASTUNER_TENANT_ID", "default_tenant")
+    tenant_id = os.getenv("FASTUNER_TENANT_ID", "default-tenant")
     return tenant_id
 
 

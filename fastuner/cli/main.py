@@ -33,12 +33,14 @@ from .finetune import finetune
 from .inference import inference
 from .deployments import deployments
 from .cleanup import cleanup
+from .logs import logs
 
 cli.add_command(datasets)
 cli.add_command(finetune)
 cli.add_command(inference)
 cli.add_command(deployments)
 cli.add_command(cleanup)
+cli.add_command(logs)
 
 
 if __name__ == "__main__":

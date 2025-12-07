@@ -9,6 +9,9 @@ This module handles:
 """
 
 import logging
+import tempfile
+import tarfile
+from pathlib import Path
 from typing import Dict, Any
 from datetime import datetime
 
@@ -30,6 +33,45 @@ class TrainingOrchestrator:
     def __init__(self):
         self.sagemaker = get_sagemaker_client()
         self.s3 = get_s3_client()
+        self.training_scripts_dir = Path(__file__).parent.parent.parent / "training_scripts"
+
+    def _prepare_source_code(self, job_id: str, tenant_id: str) -> str:
+        """
+        Package training script and upload to S3.
+
+        Returns:
+            S3 URI of the source code tarball
+        """
+        # Create temporary tarball
+        with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            # Create tarball with training script and requirements
+            with tarfile.open(tmp_path, "w:gz") as tar:
+                tar.add(
+                    self.training_scripts_dir / "train.py",
+                    arcname="train.py"
+                )
+                tar.add(
+                    self.training_scripts_dir / "requirements.txt",
+                    arcname="requirements.txt"
+                )
+
+            # Upload to S3
+            s3_key = f"{tenant_id}/source/{job_id}/sourcedir.tar.gz"
+            s3_uri = f"s3://{settings.s3_adapters_bucket}/{s3_key}"
+
+            import boto3
+            s3_client = boto3.client("s3")
+            s3_client.upload_file(tmp_path, settings.s3_adapters_bucket, s3_key)
+
+            logger.info(f"Uploaded training source code to {s3_uri}")
+            return s3_uri
+
+        finally:
+            # Clean up temp file
+            Path(tmp_path).unlink(missing_ok=True)
 
     def create_training_job(
         self,
@@ -40,7 +82,7 @@ class TrainingOrchestrator:
         adapter_name: str,
         method: FineTuneMethod,
         hyperparameters: Dict[str, Any],
-        instance_type: str = "ml.g5.2xlarge",
+        instance_type: str = "ml.m5.xlarge",  # CPU instance (GPU requires quota increase)
     ) -> Dict[str, Any]:
         """
         Create a SageMaker training job for LoRA/QLoRA fine-tuning.
@@ -58,11 +100,17 @@ class TrainingOrchestrator:
         Returns:
             SageMaker job response with job name and ARN
         """
-        # Generate unique job name (SageMaker requires)
+        # Generate unique job name (SageMaker max 63 chars, no underscores)
         timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-        job_name = f"fastuner-{tenant_id}-{job_id[:8]}-{timestamp}"
+        tenant_short = tenant_id[:8].replace("_", "-")  # Remove underscores
+        job_short = job_id[:8].replace("_", "-")  # Remove underscores from job ID
+        job_name = f"ft-{tenant_short}-{job_short}-{timestamp}"
 
-        # Prepare hyperparameters for SageMaker
+        # Upload training source code
+        logger.info("Preparing training source code...")
+        source_code_uri = self._prepare_source_code(job_id, tenant_id)
+
+        # Prepare hyperparameters for SageMaker (convert all to strings)
         training_hyperparameters = {
             # Model configuration
             "base_model_id": base_model_id,
@@ -70,15 +118,15 @@ class TrainingOrchestrator:
             "method": method.value,
 
             # Training parameters
-            "learning_rate": hyperparameters.get("learning_rate", 0.0002),
-            "num_epochs": hyperparameters.get("num_epochs", 3),
-            "batch_size": hyperparameters.get("batch_size", 4),
-            "gradient_accumulation_steps": hyperparameters.get("gradient_accumulation_steps", 4),
+            "learning_rate": str(hyperparameters.get("learning_rate", 0.0002)),
+            "num_epochs": str(hyperparameters.get("num_epochs", 3)),
+            "batch_size": str(hyperparameters.get("batch_size", 4)),
+            "gradient_accumulation_steps": str(hyperparameters.get("gradient_accumulation_steps", 4)),
 
             # LoRA configuration
-            "lora_rank": hyperparameters.get("lora_rank", 16),
-            "lora_alpha": hyperparameters.get("lora_alpha", 32),
-            "lora_dropout": hyperparameters.get("lora_dropout", 0.05),
+            "lora_rank": str(hyperparameters.get("lora_rank", 16)),
+            "lora_alpha": str(hyperparameters.get("lora_alpha", 32)),
+            "lora_dropout": str(hyperparameters.get("lora_dropout", 0.05)),
             "lora_target_modules": hyperparameters.get("lora_target_modules", "q_proj,v_proj"),
 
             # QLoRA-specific (if method is qlora)
@@ -88,16 +136,31 @@ class TrainingOrchestrator:
 
             # Output configuration
             "output_dir": "/opt/ml/model",
+
+            # Source code location (for SageMaker to find train.py)
+            "sagemaker_submit_directory": source_code_uri,
         }
 
         # Input data configuration
+        # SageMaker downloads S3 files to /opt/ml/input/data/{channel_name}/
+        # For S3Prefix, it downloads all files from that prefix
+        # For a specific file like s3://bucket/path/train.jsonl, we need to use the parent directory
+
+        # Get parent directory by removing the filename from the path
+        train_s3_dir = dataset_s3_paths["train"].rsplit("/", 1)[0] + "/"
+        val_s3_dir = dataset_s3_paths["val"].rsplit("/", 1)[0] + "/"
+
+        logger.info(f"Train S3 dir: {train_s3_dir}")
+        logger.info(f"Val S3 dir: {val_s3_dir}")
+        logger.info(f"Source code S3: {source_code_uri}")
+
         input_data_config = [
             {
                 "ChannelName": "train",
                 "DataSource": {
                     "S3DataSource": {
                         "S3DataType": "S3Prefix",
-                        "S3Uri": dataset_s3_paths["train"],
+                        "S3Uri": train_s3_dir,
                         "S3DataDistributionType": "FullyReplicated",
                     }
                 },
@@ -107,7 +170,7 @@ class TrainingOrchestrator:
                 "DataSource": {
                     "S3DataSource": {
                         "S3DataType": "S3Prefix",
-                        "S3Uri": dataset_s3_paths["val"],
+                        "S3Uri": val_s3_dir,
                         "S3DataDistributionType": "FullyReplicated",
                     }
                 },
@@ -115,7 +178,7 @@ class TrainingOrchestrator:
         ]
 
         # Output path for model artifacts
-        output_path = f"s3://{settings.s3_bucket_models}/{tenant_id}/adapters/{job_id}"
+        output_path = f"s3://{settings.s3_adapters_bucket}/{tenant_id}/adapters/{job_id}"
 
         # Training image URI
         image_uri = self.DEFAULT_TRAINING_IMAGE.format(region=settings.aws_region)
@@ -133,6 +196,7 @@ class TrainingOrchestrator:
                 instance_count=1,
                 max_runtime_seconds=86400,  # 24 hours max
                 volume_size_gb=100,
+                entry_point="train.py",
             )
 
             logger.info(f"Created SageMaker training job: {job_name}")
@@ -209,7 +273,7 @@ class TrainingOrchestrator:
         """
         # In V0, we'll assume the training script outputs adapters directly
         # In production, we'd download model.tar.gz, extract, and re-upload
-        adapter_s3_path = f"s3://{settings.s3_bucket_models}/{tenant_id}/adapters/{adapter_id}/"
+        adapter_s3_path = f"s3://{settings.s3_adapters_bucket}/{tenant_id}/adapters/{adapter_id}/"
 
         logger.info(f"Adapter artifacts available at: {adapter_s3_path}")
         return adapter_s3_path

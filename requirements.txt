@@ -31,3 +31,8 @@ numpy==1.26.3
 python-dotenv==1.0.1
 httpx==0.26.0
 tenacity==8.2.3
+
+# Testing (dev)
+pytest==8.2.0
+pytest-cov==5.0.0
+pytest-anyio==0.0.0

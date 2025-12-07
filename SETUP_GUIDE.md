@@ -185,9 +185,12 @@ $env:AWS_DEFAULT_REGION="us-west-2"
 
    **Windows:**
    ```cmd
-   python -m venv venv
+   # If you have multiple Python versions, specify 3.10
+   py -3.10 -m venv venv
    venv\Scripts\activate
    ```
+
+   **Note:** Fastuner requires Python 3.10+. If you have Python 3.14 or newer (pre-release), use Python 3.10-3.13 for best compatibility.
 
 3. **Install dependencies**:
    ```bash
@@ -297,12 +300,12 @@ $env:AWS_DEFAULT_REGION="us-west-2"
 
 ## Step 7: Test the Setup
 
-### Test 1: Upload Sentiment Dataset
+### Test 1: Upload Instruction Dataset
 
 ```bash
-fastuner datasets upload examples/sentiment_analysis/sentiment.jsonl \
-  --name "sentiment_test" \
-  --task-type classification
+fastuner datasets upload examples/instruction_tuning/instructions.jsonl \
+  --name "instructions_test" \
+  --task-type text_generation
 ```
 
 **Expected output:**
@@ -310,10 +313,10 @@ fastuner datasets upload examples/sentiment_analysis/sentiment.jsonl \
 ✓ Dataset uploaded successfully!
 
 Dataset ID: ds_abc123def456
-Name: sentiment_test
-Task Type: classification
+Name: instructions_test
+Task Type: text_generation
 Total Samples: 100
-Train: 80 | Validation: 10 | Test: 10
+Train: 80 | Val: 10 | Test: 10
 ```
 
 ### Test 2: List Datasets
@@ -328,9 +331,9 @@ You should see your uploaded dataset.
 
 ```bash
 fastuner finetune start \
-  --model-id distilbert-base-uncased \
+  --model-id Qwen/Qwen2.5-0.5B-Instruct \
   --dataset-id ds_abc123def456 \
-  --adapter-name sentiment_adapter_v1 \
+  --adapter-name instruction_adapter_v1 \
   --method lora \
   --num-epochs 3
 ```
@@ -340,9 +343,9 @@ fastuner finetune start \
 ✓ Fine-tuning job started!
 
 Job ID: ftj_xyz789
-Model: distilbert-base-uncased
+Model: Qwen/Qwen2.5-0.5B-Instruct
 Dataset: ds_abc123def456
-Adapter Name: sentiment_adapter_v1
+Adapter Name: instruction_adapter_v1
 Status: RUNNING
 ```
 
@@ -385,17 +388,17 @@ Wait until status is **ACTIVE**.
 
 ```bash
 fastuner inference run \
-  --model-id distilbert-base-uncased \
-  --adapter sentiment_adapter_v1 \
-  --input "This product is absolutely amazing!"
+  --model-id Qwen/Qwen2.5-0.5B-Instruct \
+  --adapter instruction_adapter_v1 \
+  --input "Explain machine learning in simple terms."
 ```
 
 **Expected output:**
 ```
 ✓ Inference complete!
 
-Output: positive
-Latency: 145ms
+Output: Machine learning trains algorithms on data to recognize patterns...
+Latency: 245ms
 ```
 
 ---

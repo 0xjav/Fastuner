@@ -72,16 +72,16 @@ async def create_dataset(
 
         try:
             raw_s3_path = s3_client.upload_jsonl(
-                settings.s3_bucket_datasets, raw_key, records
+                settings.s3_datasets_bucket, raw_key, records
             )
             train_s3_path = s3_client.upload_jsonl(
-                settings.s3_bucket_datasets, train_key, splits["train"]
+                settings.s3_datasets_bucket, train_key, splits["train"]
             )
             val_s3_path = s3_client.upload_jsonl(
-                settings.s3_bucket_datasets, val_key, splits["val"]
+                settings.s3_datasets_bucket, val_key, splits["val"]
             )
             test_s3_path = s3_client.upload_jsonl(
-                settings.s3_bucket_datasets, test_key, splits["test"]
+                settings.s3_datasets_bucket, test_key, splits["test"]
             )
         except Exception as e:
             logger.error(f"S3 upload failed: {e}")
@@ -181,7 +181,7 @@ async def delete_dataset(
     try:
         s3_client = get_s3_client()
         prefix = f"{tenant_id}/datasets/{dataset_id}/"
-        s3_client.delete_prefix(settings.s3_bucket_datasets, prefix)
+        s3_client.delete_prefix(settings.s3_datasets_bucket, prefix)
         logger.info(f"Deleted S3 files for dataset {dataset_id}")
     except Exception as e:
         logger.error(f"Failed to delete S3 files: {e}")

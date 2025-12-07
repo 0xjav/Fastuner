@@ -36,12 +36,13 @@ class DatasetValidator:
     MIN_UNIQUE_SAMPLES = 100
 
     @classmethod
-    def validate_jsonl(cls, file_content: str) -> List[Dict[str, str]]:
+    def validate_jsonl(cls, file_content: str, skip_min_samples: bool = False) -> List[Dict[str, str]]:
         """
         Validate and parse JSONL file content.
 
         Args:
             file_content: Raw JSONL file content as string
+            skip_min_samples: Skip minimum sample count validation (for testing)
 
         Returns:
             List of validated and deduplicated records
@@ -88,8 +89,8 @@ class DatasetValidator:
         except UnicodeDecodeError as e:
             raise ValidationError(f"Line {line_number}: Non-UTF-8 encoding - {str(e)}")
 
-        # Validate minimum samples
-        if len(records) < cls.MIN_UNIQUE_SAMPLES:
+        # Validate minimum samples (unless skipped for testing)
+        if not skip_min_samples and len(records) < cls.MIN_UNIQUE_SAMPLES:
             raise ValidationError(
                 f"Need ≥{cls.MIN_UNIQUE_SAMPLES} unique samples, got {len(records)}"
             )

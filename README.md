@@ -7,7 +7,7 @@ Fastuner enables developers to deploy and fine-tune open-source LLMs with a sing
 ## Features
 
 - **One-click deployment** of Hugging Face models to SageMaker
-- **LoRA/QLoRA fine-tuning** with automatic dataset validation
+- **LoRA/QLoRA fine-tuning** for any transformer-based LLM (Llama, Qwen, Gemma, etc.)
 - **Multi-tenant adapter serving** on shared base model endpoints
 - **Ephemeral compute** with TTL-driven cleanup for cost optimization
 - **Task-aware dataset splitting** with stratification support
@@ -44,15 +44,15 @@ cd infra/terraform
 ### 4. Use the CLI
 ```bash
 # Upload dataset
-fastuner datasets upload examples/sentiment_analysis/sentiment.jsonl \
-  --name "sentiment_v1" \
-  --task-type classification
+fastuner datasets upload examples/instruction_tuning/instructions.jsonl \
+  --name "instructions_v1" \
+  --task-type text_generation
 
 # Fine-tune with LoRA
 fastuner finetune start \
-  --model-id distilbert-base-uncased \
+  --model-id Qwen/Qwen2.5-0.5B-Instruct \
   --dataset-id ds_xxx \
-  --adapter-name sentiment_adapter \
+  --adapter-name instruction_adapter \
   --method lora
 
 # Deploy adapter
@@ -60,9 +60,9 @@ fastuner deployments create --adapter-id adp_xxx
 
 # Run inference
 fastuner inference run \
-  --model-id distilbert-base-uncased \
-  --adapter sentiment_adapter \
-  --input "This product is amazing!"
+  --model-id Qwen/Qwen2.5-0.5B-Instruct \
+  --adapter instruction_adapter \
+  --input "Explain what machine learning is in simple terms."
 
 # Monitor costs
 fastuner cleanup cost-report
@@ -81,8 +81,8 @@ See [SETUP_GUIDE.md](SETUP_GUIDE.md) for detailed instructions and troubleshooti
 ## Dataset Schema
 
 ```jsonl
-{"input_text": "Classify sentiment: I love this product!", "target_text": "positive"}
-{"input_text": "Classify sentiment: Terrible experience.", "target_text": "negative"}
+{"input_text": "Explain what photosynthesis is in simple terms.", "target_text": "Photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar."}
+{"input_text": "Write a haiku about coding.", "target_text": "Lines of code dance free\nBugs hide in logic's shadow\nCompile, run, and breathe"}
 ```
 
 Requirements:
@@ -90,6 +90,11 @@ Requirements:
 - UTF-8 strings only
 - `input_text`: 1-8192 chars
 - `target_text`: 1-2048 chars
+
+## Example Datasets
+
+- **[Instruction Tuning](examples/instruction_tuning/)** - 100 diverse instruction-response pairs
+- **[Skyrim NER](examples/skyrim_ner/)** - 100 entity extraction examples from gaming lore
 
 ## Development
 

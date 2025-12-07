@@ -9,7 +9,7 @@ class FineTuneJobCreate(BaseModel):
     """Schema for creating a fine-tune job"""
 
     base_model_id: str = Field(..., min_length=1, max_length=255)
-    dataset_id: str = Field(..., min_length=1, max_length=36)
+    dataset_id: str = Field(..., min_length=1, max_length=64)
     method: str = Field(..., pattern="^(lora|qlora)$")
     adapter_name: str = Field(..., min_length=1, max_length=255)
 

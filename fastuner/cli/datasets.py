@@ -107,15 +107,15 @@ def list_datasets(limit: int):
             return
 
         table = Table(title="Datasets")
-        table.add_column("ID", style="cyan")
-        table.add_column("Name", style="green")
+        table.add_column("ID", style="cyan", no_wrap=True)
+        table.add_column("Name", style="green", no_wrap=False)
         table.add_column("Task Type", style="magenta")
         table.add_column("Samples", justify="right")
         table.add_column("Train/Val/Test", justify="right")
 
         for ds in datasets:
             table.add_row(
-                ds["id"][:8] + "...",
+                ds["id"],
                 ds["name"],
                 ds["task_type"],
                 str(ds["total_samples"]),

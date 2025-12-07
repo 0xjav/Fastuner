@@ -17,9 +17,8 @@ class Settings(BaseSettings):
     aws_account_id: str = ""
 
     # S3 Buckets
-    s3_bucket_datasets: str = "fastuner-datasets-dev"
-    s3_bucket_models: str = "fastuner-models-dev"
-    s3_bucket_artifacts: str = "fastuner-artifacts-dev"
+    s3_datasets_bucket: str = "fastuner-datasets-dev"
+    s3_adapters_bucket: str = "fastuner-adapters-dev"
 
     # SageMaker
     sagemaker_execution_role_arn: str = ""
