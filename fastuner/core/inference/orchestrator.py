@@ -70,10 +70,13 @@ class InferenceOrchestrator:
                 # Endpoint doesn't exist, create it
                 pass
 
-            # Generate unique model and config names
+            # Generate unique model and config names (max 63 chars for SageMaker)
             timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-            model_name = f"{endpoint_name}-model-{timestamp}"
-            config_name = f"{endpoint_name}-config-{timestamp}"
+            # Ensure names fit within 63 char limit: endpoint_name (max 35) + suffix (max 28)
+            max_endpoint_len = 35
+            safe_endpoint_name = endpoint_name[:max_endpoint_len] if len(endpoint_name) > max_endpoint_len else endpoint_name
+            model_name = f"{safe_endpoint_name}-m-{timestamp}"
+            config_name = f"{safe_endpoint_name}-c-{timestamp}"
 
             # LMI environment variables for adapter loading
             environment = {

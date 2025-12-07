@@ -8,7 +8,7 @@ from datetime import datetime
 class DeploymentCreate(BaseModel):
     """Schema for creating a deployment"""
 
-    adapter_id: str = Field(..., min_length=1, max_length=36)
+    adapter_id: str = Field(..., min_length=1, max_length=64)
     instance_type: str = Field(default="ml.g5.2xlarge")
     instance_count: int = Field(default=1, ge=1, le=10)
     ttl_seconds: int = Field(default=3600, ge=300, le=86400)  # 5 min to 24 hours

@@ -46,7 +46,17 @@ async def create_deployment(
 
         # Step 2: Create deployment record
         deployment_id = generate_deployment_id()
-        endpoint_name = f"fastuner-{tenant_id[:8]}-{adapter.name[:20]}-{deployment_id[:8]}"
+        # Sanitize names for SageMaker (alphanumeric and single hyphens only)
+        def sanitize(s):
+            result = "".join(c if c.isalnum() or c == "-" else "-" for c in s)
+            while "--" in result:
+                result = result.replace("--", "-")
+            return result.strip("-")
+
+        sanitized_tenant = sanitize(tenant_id[:8])
+        sanitized_name = sanitize(adapter.name[:15])
+        sanitized_dep_id = sanitize(deployment_id[:8])
+        endpoint_name = f"ft-{sanitized_tenant}-{sanitized_name}-{sanitized_dep_id}"
 
         deployment = Deployment(
             id=deployment_id,

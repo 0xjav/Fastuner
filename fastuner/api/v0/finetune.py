@@ -1,7 +1,7 @@
 """Fine-tune job API endpoints"""
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 import logging
 
@@ -12,6 +12,9 @@ from fastuner.models.dataset import Dataset
 from fastuner.models.adapter import Adapter
 from fastuner.core.training import TrainingOrchestrator
 from fastuner.utils.id_generator import generate_job_id, generate_adapter_id
+from fastuner.config import get_settings
+
+settings = get_settings()
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -131,14 +134,63 @@ async def list_fine_tune_jobs(
     limit: int = 100,
     db: Session = Depends(get_db),
 ):
-    """List all fine-tune jobs for a tenant"""
+    """List all fine-tune jobs for a tenant and sync running job statuses"""
     jobs = (
         db.query(FineTuneJob)
+        .options(joinedload(FineTuneJob.adapter))  # Eager load adapter relationship
         .filter(FineTuneJob.tenant_id == tenant_id)
         .offset(skip)
         .limit(limit)
         .all()
     )
+
+    # Sync status for all running/pending jobs
+    for job in jobs:
+        if job.status in [JobStatus.RUNNING, JobStatus.PENDING] and job.sagemaker_job_name:
+            try:
+                sagemaker_status = training_orchestrator.get_training_job_status(job.sagemaker_job_name)
+
+                # Update job status based on SageMaker status
+                if sagemaker_status["status"] == "Completed":
+                    job.status = JobStatus.COMPLETED
+
+                    # Create adapter record if it doesn't exist
+                    existing_adapter = db.query(Adapter).filter(
+                        Adapter.fine_tune_job_id == job.id
+                    ).first()
+
+                    if not existing_adapter and sagemaker_status.get("model_artifacts"):
+                        adapter_id = generate_adapter_id()
+                        adapter_s3_path = sagemaker_status["model_artifacts"]
+
+                        adapter = Adapter(
+                            id=adapter_id,
+                            tenant_id=job.tenant_id,
+                            fine_tune_job_id=job.id,
+                            name=job.adapter_name,
+                            base_model_id=job.base_model_id,
+                            s3_path=adapter_s3_path,
+                            version=1,
+                        )
+                        db.add(adapter)
+                        logger.info(f"Created adapter {adapter_id} for job {job.id}")
+
+                elif sagemaker_status["status"] in ["Failed", "Stopped"]:
+                    job.status = JobStatus.FAILED
+                    job.error_message = sagemaker_status.get("failure_reason")
+
+            except Exception as e:
+                logger.warning(f"Failed to sync SageMaker status for job {job.id}: {e}")
+
+    db.commit()
+
+    # Add adapter_id to all jobs after sync (so newly created adapters are included)
+    for job in jobs:
+        if job.adapter:
+            job.adapter_id = job.adapter.id
+        else:
+            job.adapter_id = None
+
     return jobs
 
 
@@ -148,7 +200,7 @@ async def get_fine_tune_job(
     tenant_id: str,  # TODO: Extract from JWT token
     db: Session = Depends(get_db),
 ):
-    """Get fine-tune job details by ID"""
+    """Get fine-tune job details by ID and sync status from SageMaker"""
     job = (
         db.query(FineTuneJob)
         .filter(FineTuneJob.id == job_id, FineTuneJob.tenant_id == tenant_id)
@@ -157,6 +209,48 @@ async def get_fine_tune_job(
 
     if not job:
         raise HTTPException(status_code=404, detail="Fine-tune job not found")
+
+    # Sync status from SageMaker if job is still running/pending
+    if job.status in [JobStatus.RUNNING, JobStatus.PENDING] and job.sagemaker_job_name:
+        try:
+            sagemaker_status = training_orchestrator.get_training_job_status(job.sagemaker_job_name)
+
+            # Update job status based on SageMaker status
+            if sagemaker_status["status"] == "Completed":
+                job.status = JobStatus.COMPLETED
+                job.final_train_loss = None  # TODO: Extract from metrics
+                job.final_val_loss = None
+
+                # Create adapter record if it doesn't exist
+                existing_adapter = db.query(Adapter).filter(
+                    Adapter.fine_tune_job_id == job.id
+                ).first()
+
+                if not existing_adapter and sagemaker_status.get("model_artifacts"):
+                    adapter_id = generate_adapter_id()
+                    adapter_s3_path = sagemaker_status["model_artifacts"]
+
+                    adapter = Adapter(
+                        id=adapter_id,
+                        tenant_id=job.tenant_id,
+                        fine_tune_job_id=job.id,
+                        name=job.adapter_name,
+                        base_model_id=job.base_model_id,
+                        s3_path=adapter_s3_path,
+                        version=1,
+                    )
+                    db.add(adapter)
+                    logger.info(f"Created adapter {adapter_id} for job {job.id}")
+
+            elif sagemaker_status["status"] in ["Failed", "Stopped"]:
+                job.status = JobStatus.FAILED
+                job.error_message = sagemaker_status.get("failure_reason")
+
+            db.commit()
+            db.refresh(job)
+
+        except Exception as e:
+            logger.warning(f"Failed to sync SageMaker status for job {job_id}: {e}")
 
     return job
 

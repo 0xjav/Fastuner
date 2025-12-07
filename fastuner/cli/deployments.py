@@ -146,6 +146,11 @@ def create_deployment(adapter_id: str, instance_type: str, instance_count: int, 
 
     except httpx.HTTPStatusError as e:
         console.print(f"❌ [red]Error: {e.response.status_code}[/red]")
+        try:
+            error_detail = e.response.json()
+            console.print(f"[red]{error_detail}[/red]")
+        except:
+            console.print(f"[red]{e.response.text}[/red]")
         raise click.Abort()
     except Exception as e:
         console.print(f"❌ [red]Error: {e}[/red]")

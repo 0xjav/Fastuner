@@ -37,6 +37,7 @@ class FineTuneJobResponse(BaseModel):
     base_model_id: str
     method: str
     adapter_name: str
+    adapter_id: Optional[str] = None  # ID of created adapter (if completed)
     learning_rate: float
     num_epochs: int
     batch_size: int

@@ -129,13 +129,12 @@ def list_finetune_jobs(limit: int):
             console.print("[yellow]No fine-tune jobs found[/yellow]")
             return
 
-        table = Table(title="Fine-Tune Jobs")
-        table.add_column("ID", style="cyan")
-        table.add_column("Adapter", style="green")
-        table.add_column("Model", style="magenta")
+        table = Table(title="Fine-Tune Jobs", show_lines=True)
+        table.add_column("Job ID", style="cyan", no_wrap=False)
+        table.add_column("Adapter ID", style="bright_cyan", no_wrap=False)
+        table.add_column("Model", style="magenta", no_wrap=False)
         table.add_column("Status", style="yellow")
         table.add_column("Method")
-        table.add_column("Epochs", justify="right")
 
         for job in jobs:
             status_color = {
@@ -145,13 +144,14 @@ def list_finetune_jobs(limit: int):
                 "failed": "red",
             }.get(job["status"], "white")
 
+            adapter_id = job.get("adapter_id") or "-"
+
             table.add_row(
-                job["id"][:8] + "...",
-                job["adapter_name"],
-                job["base_model_id"].split("/")[-1][:20],
+                job["id"],
+                adapter_id,
+                job["base_model_id"],
                 f"[{status_color}]{job['status']}[/{status_color}]",
                 job["method"].upper(),
-                str(job["num_epochs"]),
             )
 
         console.print(table)
