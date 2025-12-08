@@ -1,17 +1,16 @@
 """
 Dataset splitting module for V0.
 
-Implements task-aware, deterministic splitting:
-- Classification: Stratified split (preserves label distribution)
-- Generation/QA: Random shuffled split
+Implements deterministic splitting for text generation tasks:
+- Random shuffled split for TEXT_GENERATION tasks
+- 80/10/10 train/val/test split with configurable ratios
 - Seed-based reproducibility
-- Minimum sample validation (80/10/10)
+- Minimum sample validation (80/10/10 samples minimum)
 """
 
 import random
 import logging
-from typing import List, Dict, Any
-from collections import defaultdict, Counter
+from typing import List, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +32,6 @@ class DatasetSplitter:
     MIN_VAL_SAMPLES = 10
     MIN_TEST_SAMPLES = 10
 
-    # Minimum samples per label for classification
-    MIN_SAMPLES_PER_LABEL = 3
-
     @classmethod
     def split(
         cls,
@@ -45,11 +41,11 @@ class DatasetSplitter:
         ratios: Dict[str, float] = None,
     ) -> Dict[str, List[Dict[str, str]]]:
         """
-        Split dataset based on task type.
+        Split dataset for text generation tasks.
 
         Args:
             records: List of validated records
-            task_type: One of "classification", "text_generation", "qa"
+            task_type: Task type (currently only TEXT_GENERATION supported)
             seed: Random seed for reproducibility
             ratios: Custom split ratios (defaults to 80/10/10)
 
@@ -61,10 +57,8 @@ class DatasetSplitter:
         """
         ratios = ratios or cls.DEFAULT_RATIOS
 
-        if task_type == "classification":
-            splits = cls._stratified_split(records, ratios, seed)
-        else:  # text_generation or qa
-            splits = cls._random_split(records, ratios, seed)
+        # Random shuffled split for text generation
+        splits = cls._random_split(records, ratios, seed)
 
         # Validate splits
         cls._validate_splits(splits)
@@ -99,62 +93,6 @@ class DatasetSplitter:
         }
 
     @classmethod
-    def _stratified_split(
-        cls,
-        records: List[Dict[str, str]],
-        ratios: Dict[str, float],
-        seed: int,
-    ) -> Dict[str, List[Dict[str, str]]]:
-        """Stratified split for classification tasks"""
-        random.seed(seed)
-
-        # Group records by label
-        label_groups: Dict[str, List[Dict[str, str]]] = defaultdict(list)
-        for record in records:
-            label = record["target_text"]
-            label_groups[label].append(record)
-
-        # Validate minimum samples per label
-        for label, group in label_groups.items():
-            if len(group) < cls.MIN_SAMPLES_PER_LABEL:
-                raise SplitValidationError(
-                    f"Label '{label}' has only {len(group)} samples, "
-                    f"need at least {cls.MIN_SAMPLES_PER_LABEL}"
-                )
-
-        # Split each label group proportionally
-        train_records = []
-        val_records = []
-        test_records = []
-
-        for label, group in label_groups.items():
-            random.shuffle(group)  # Shuffle within each label
-
-            total = len(group)
-            train_end = int(total * ratios["train"])
-            val_end = train_end + int(total * ratios["val"])
-
-            train_records.extend(group[:train_end])
-            val_records.extend(group[train_end:val_end])
-            test_records.extend(group[val_end:])
-
-        # Final shuffle to mix labels
-        random.shuffle(train_records)
-        random.shuffle(val_records)
-        random.shuffle(test_records)
-
-        splits = {
-            "train": train_records,
-            "val": val_records,
-            "test": test_records,
-        }
-
-        # Validate label distribution
-        cls._validate_label_distribution(label_groups, splits)
-
-        return splits
-
-    @classmethod
     def _validate_splits(cls, splits: Dict[str, List[Dict[str, str]]]) -> None:
         """Validate minimum sample requirements"""
         if len(splits["train"]) < cls.MIN_TRAIN_SAMPLES:
@@ -174,20 +112,3 @@ class DatasetSplitter:
                 f"Test split must have ≥{cls.MIN_TEST_SAMPLES} samples, "
                 f"got {len(splits['test'])}"
             )
-
-    @classmethod
-    def _validate_label_distribution(
-        cls,
-        label_groups: Dict[str, List[Dict[str, str]]],
-        splits: Dict[str, List[Dict[str, str]]],
-    ) -> None:
-        """Validate that label distributions are preserved in stratified splits"""
-        for split_name, split_records in splits.items():
-            split_label_counts = Counter(r["target_text"] for r in split_records)
-
-            for label in label_groups.keys():
-                if label not in split_label_counts:
-                    logger.warning(
-                        f"Label '{label}' missing from {split_name} split "
-                        "(likely due to small sample size)"
-                    )

@@ -1,6 +1,6 @@
 """Database connection and session management"""
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, Session
 from contextlib import contextmanager
 from typing import Generator
@@ -18,6 +18,17 @@ engine = create_engine(
     max_overflow=20,
     echo=not settings.is_production,
 )
+
+
+# Enable foreign key constraints for SQLite
+# SQLite has foreign keys disabled by default - we need to explicitly enable them
+@event.listens_for(engine, "connect")
+def set_sqlite_pragma(dbapi_conn, connection_record):
+    """Enable foreign key constraints on each SQLite connection"""
+    if 'sqlite' in settings.database_url:
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
