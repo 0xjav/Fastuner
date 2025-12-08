@@ -51,6 +51,7 @@ class FineTuneJobResponse(BaseModel):
     error_message: Optional[str] = None
     final_train_loss: Optional[float] = None
     final_val_loss: Optional[float] = None
+    final_test_loss: Optional[float] = None
     metrics_s3_path: Optional[str] = None
     auto_deploy: bool
     created_at: datetime

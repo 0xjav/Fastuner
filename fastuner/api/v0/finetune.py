@@ -2,8 +2,10 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
-from typing import List
+from typing import List, Dict, Optional
 import logging
+import boto3
+import json
 
 from fastuner.database import get_db
 from fastuner.schemas.finetune import FineTuneJobResponse, FineTuneJobCreate
@@ -19,6 +21,51 @@ settings = get_settings()
 router = APIRouter()
 logger = logging.getLogger(__name__)
 training_orchestrator = TrainingOrchestrator()
+s3_client = boto3.client('s3')
+
+
+def retrieve_metrics_from_s3(job_name: str, output_s3_path: str) -> Optional[Dict]:
+    """
+    Retrieve training metrics from S3.
+
+    Args:
+        job_name: SageMaker job name
+        output_s3_path: S3 output path for training job
+
+    Returns:
+        Dict with train/validation/test metrics, or None if not found
+    """
+    try:
+        # SageMaker uploads output to: s3://bucket/path/job-name/output/output.tar.gz
+        # But our metrics are saved to: s3://bucket/path/job-name/output/metrics.json
+        # Actually, SageMaker uploads everything in /opt/ml/output/ directly
+
+        # Parse S3 path
+        if output_s3_path.startswith("s3://"):
+            output_s3_path = output_s3_path[5:]
+
+        parts = output_s3_path.split("/", 1)
+        bucket = parts[0]
+        prefix = parts[1] if len(parts) > 1 else ""
+
+        # Construct metrics S3 key: <prefix>/<job-name>/output/metrics.json
+        metrics_key = f"{prefix}/{job_name}/output/metrics.json"
+
+        logger.info(f"Attempting to retrieve metrics from s3://{bucket}/{metrics_key}")
+
+        # Download metrics file
+        response = s3_client.get_object(Bucket=bucket, Key=metrics_key)
+        metrics_data = json.loads(response['Body'].read().decode('utf-8'))
+
+        logger.info(f"Successfully retrieved metrics for job {job_name}")
+        return metrics_data
+
+    except s3_client.exceptions.NoSuchKey:
+        logger.warning(f"Metrics file not found for job {job_name} at s3://{bucket}/{metrics_key}")
+        return None
+    except Exception as e:
+        logger.error(f"Failed to retrieve metrics for job {job_name}: {e}", exc_info=True)
+        return None
 
 
 @router.post("/", response_model=FineTuneJobResponse, status_code=201)
@@ -218,8 +265,20 @@ async def get_fine_tune_job(
             # Update job status based on SageMaker status
             if sagemaker_status["status"] == "Completed":
                 job.status = JobStatus.COMPLETED
-                job.final_train_loss = None  # TODO: Extract from metrics
-                job.final_val_loss = None
+
+                # Retrieve and store metrics from S3
+                if sagemaker_status.get("output_data_config"):
+                    metrics = retrieve_metrics_from_s3(
+                        job.sagemaker_job_name,
+                        sagemaker_status["output_data_config"]
+                    )
+                    if metrics:
+                        job.final_train_loss = metrics.get("train", {}).get("train_loss")
+                        job.final_val_loss = metrics.get("validation", {}).get("eval_loss")
+                        job.final_test_loss = metrics.get("test", {}).get("eval_loss")
+                        logger.info(f"Stored metrics for job {job.id}: train={job.final_train_loss}, val={job.final_val_loss}, test={job.final_test_loss}")
+                    else:
+                        logger.warning(f"Could not retrieve metrics for job {job.id}")
 
                 # Create adapter record if it doesn't exist
                 existing_adapter = db.query(Adapter).filter(

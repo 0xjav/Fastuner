@@ -149,9 +149,11 @@ class TrainingOrchestrator:
         # Get parent directory by removing the filename from the path
         train_s3_dir = dataset_s3_paths["train"].rsplit("/", 1)[0] + "/"
         val_s3_dir = dataset_s3_paths["val"].rsplit("/", 1)[0] + "/"
+        test_s3_dir = dataset_s3_paths["test"].rsplit("/", 1)[0] + "/"
 
         logger.info(f"Train S3 dir: {train_s3_dir}")
         logger.info(f"Val S3 dir: {val_s3_dir}")
+        logger.info(f"Test S3 dir: {test_s3_dir}")
         logger.info(f"Source code S3: {source_code_uri}")
 
         input_data_config = [
@@ -171,6 +173,16 @@ class TrainingOrchestrator:
                     "S3DataSource": {
                         "S3DataType": "S3Prefix",
                         "S3Uri": val_s3_dir,
+                        "S3DataDistributionType": "FullyReplicated",
+                    }
+                },
+            },
+            {
+                "ChannelName": "test",
+                "DataSource": {
+                    "S3DataSource": {
+                        "S3DataType": "S3Prefix",
+                        "S3Uri": test_s3_dir,
                         "S3DataDistributionType": "FullyReplicated",
                     }
                 },
@@ -229,6 +241,7 @@ class TrainingOrchestrator:
                 "secondary_status": job_details.get("SecondaryStatus"),
                 "failure_reason": job_details.get("FailureReason"),
                 "model_artifacts": job_details.get("ModelArtifacts", {}).get("S3ModelArtifacts"),
+                "output_data_config": job_details.get("OutputDataConfig", {}).get("S3OutputPath"),
                 "training_time_seconds": job_details.get("TrainingTimeInSeconds"),
                 "billable_time_seconds": job_details.get("BillableTimeInSeconds"),
                 "final_metric_data": job_details.get("FinalMetricDataList", []),

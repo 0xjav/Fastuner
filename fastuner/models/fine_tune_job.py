@@ -65,6 +65,7 @@ class FineTuneJob(Base, TimestampMixin):
     # Metrics
     final_train_loss: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     final_val_loss: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    final_test_loss: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     metrics_s3_path: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
 
     # Auto-deployment flag

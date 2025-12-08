@@ -16,6 +16,7 @@ import argparse
 from pathlib import Path
 from typing import Dict, List
 
+import boto3
 import torch
 from transformers import (
     AutoTokenizer,
@@ -124,6 +125,7 @@ def main():
     # SageMaker paths (from environment)
     train_dir = os.environ.get("SM_CHANNEL_TRAIN", "/opt/ml/input/data/train")
     val_dir = os.environ.get("SM_CHANNEL_VALIDATION", "/opt/ml/input/data/validation")
+    test_dir = os.environ.get("SM_CHANNEL_TEST", "/opt/ml/input/data/test")
     model_dir = os.environ.get("SM_MODEL_DIR", "/opt/ml/model")
     output_dir = os.environ.get("SM_OUTPUT_DATA_DIR", "/opt/ml/output")
 
@@ -133,11 +135,13 @@ def main():
     logger.info(f"Use 4-bit: {use_4bit}")
     logger.info(f"Train dir: {train_dir}")
     logger.info(f"Val dir: {val_dir}")
+    logger.info(f"Test dir: {test_dir}")
 
     # Load datasets
     logger.info("Loading datasets...")
     logger.info(f"Looking for train data in: {train_dir}")
     logger.info(f"Looking for val data in: {val_dir}")
+    logger.info(f"Looking for test data in: {test_dir}")
 
     # List files in directories for debugging
     try:
@@ -152,19 +156,28 @@ def main():
             logger.info(f"Files in val dir: {val_files}")
         else:
             logger.error(f"Val directory does not exist: {val_dir}")
+
+        if Path(test_dir).exists():
+            test_files = list(Path(test_dir).iterdir())
+            logger.info(f"Files in test dir: {test_files}")
+        else:
+            logger.error(f"Test directory does not exist: {test_dir}")
     except Exception as e:
         logger.warning(f"Could not list directory contents: {e}")
 
     train_file = Path(train_dir) / "train.jsonl"
     val_file = Path(val_dir) / "val.jsonl"
+    test_file = Path(test_dir) / "test.jsonl"
 
     logger.info(f"Train file exists: {train_file.exists()}")
     logger.info(f"Val file exists: {val_file.exists()}")
+    logger.info(f"Test file exists: {test_file.exists()}")
 
     train_records = load_jsonl(train_file)
     val_records = load_jsonl(val_file)
+    test_records = load_jsonl(test_file)
 
-    logger.info(f"Loaded {len(train_records)} train samples, {len(val_records)} val samples")
+    logger.info(f"Loaded {len(train_records)} train samples, {len(val_records)} val samples, {len(test_records)} test samples")
 
     # Load tokenizer and model
     logger.info("Loading tokenizer and model...")
@@ -212,6 +225,7 @@ def main():
     logger.info("Tokenizing datasets...")
     train_dataset = prepare_generation_dataset(train_records, tokenizer)
     val_dataset = prepare_generation_dataset(val_records, tokenizer)
+    test_dataset = prepare_generation_dataset(test_records, tokenizer)
 
     # Data collator for language modeling
     data_collator = DataCollatorForLanguageModeling(
@@ -263,15 +277,60 @@ def main():
     trainer.log_metrics("train", metrics)
     trainer.save_metrics("train", metrics)
 
-    # Evaluate
-    logger.info("Running final evaluation...")
+    # Evaluate on validation set
+    logger.info("Running final evaluation on validation set...")
     eval_metrics = trainer.evaluate()
     trainer.log_metrics("eval", eval_metrics)
     trainer.save_metrics("eval", eval_metrics)
 
+    # Evaluate on test set
+    logger.info("Running final evaluation on test set...")
+    test_metrics = trainer.evaluate(eval_dataset=test_dataset)
+    trainer.log_metrics("test", test_metrics)
+    trainer.save_metrics("test", test_metrics)
+
     logger.info("Training complete!")
     logger.info(f"Final train loss: {metrics.get('train_loss', 'N/A')}")
     logger.info(f"Final eval loss: {eval_metrics.get('eval_loss', 'N/A')}")
+    logger.info(f"Final test loss: {test_metrics.get('eval_loss', 'N/A')}")
+
+    # Upload metrics to S3 for retrieval by API
+    try:
+        logger.info("Uploading metrics to S3...")
+
+        # Get S3 output path from environment (set by orchestrator)
+        output_s3_path = os.environ.get("SM_OUTPUT_DATA_DIR", "")
+
+        # Combine all metrics
+        all_metrics = {
+            "train": {
+                "train_loss": metrics.get("train_loss"),
+                "train_runtime": metrics.get("train_runtime"),
+                "train_samples_per_second": metrics.get("train_samples_per_second"),
+            },
+            "validation": {
+                "eval_loss": eval_metrics.get("eval_loss"),
+                "eval_runtime": eval_metrics.get("eval_runtime"),
+                "eval_samples_per_second": eval_metrics.get("eval_samples_per_second"),
+            },
+            "test": {
+                "eval_loss": test_metrics.get("eval_loss"),
+                "eval_runtime": test_metrics.get("eval_runtime"),
+                "eval_samples_per_second": test_metrics.get("eval_samples_per_second"),
+            }
+        }
+
+        # Save locally first
+        metrics_file = Path(output_dir) / "metrics.json"
+        with open(metrics_file, "w") as f:
+            json.dump(all_metrics, f, indent=2)
+
+        logger.info(f"Metrics saved locally to {metrics_file}")
+        logger.info(f"Metrics: {json.dumps(all_metrics, indent=2)}")
+
+    except Exception as e:
+        logger.error(f"Failed to save metrics: {e}", exc_info=True)
+        # Don't fail the job if metrics upload fails
 
 
 if __name__ == "__main__":
